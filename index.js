@@ -16,11 +16,13 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 
 async function run () {
+    
     try {
         await client.connect();
         const database= client.db('travel-packages');
         const packageCollection = database.collection('packages');
         const usersCollection = database.collection('users');
+        const ordersCollection = database.collection('orders');
 
         //Get Api
         app.get('/packages', async(req,res) => {
@@ -36,21 +38,66 @@ async function run () {
             const singlePackage = await packageCollection.findOne(query);
             res.send(singlePackage);
         })
+        //Get All orders for Admin
+        app.get('/manageorder', async(req,res) => {
+            const data = ordersCollection.find();
+            const orders = await data.toArray();
+            res.send(orders);
+        })
+        //Get specific user Orders
+        app.get('/orders/:usid', async(req,res) => {
+            const id = req.params.usid;
+            const query = {userId: id}
+            const data = ordersCollection.find(query);
+            const orders = await data.toArray();
+            res.send(orders);
+        })
+        
 
-        //Get New user
+        //Post api
         app.post('/users', async(req, res) => {
             const newUser = req.body;
-            console.log(newUser);
-            const result = await usersCollection.insertOne(newUser);
-            console.log('got new user', req.body);
-            console.log('added user', result);
+            const {email} = newUser;
+            const existingUser = await usersCollection.findOne({email});
+            if(existingUser){
+                console.log("already user exist")
+                res.json({error: "User already exist"})
+            } else {
+                const result = await usersCollection.insertOne(newUser);
+                res.json(result);
+            }
+            
+          })
+
+        //Get orders
+        app.post('/orders', async(req, res) => {
+            const orderPackage = req.body;
+            const result = await ordersCollection.insertOne(orderPackage);
             res.json(result);
           })
+
+        //Add a new offer Package
+        app.post('/packages', async(req, res) => {
+            const newOfferPackage = req.body;
+            const result = await packageCollection.insertOne(newOfferPackage);
+            res.json(result);
+          })
+
+
+
+        //Delete api
+        app.delete('/orders/:usid', async(req,res) => {
+            const id = req.params.usid;
+            const query = {selectedPackageId: id}
+            const result = ordersCollection.deleteOne(query);
+            res.send(result);
+        })
     }
     finally {
     //    await client.close();
     }
 }
+
 run().catch(console.dir);
 app.get('/', (req, res) => {
     res.send('Server is running');
